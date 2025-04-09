@@ -1,0 +1,4 @@
+[flake8]
+ignore = E501,W293
+max-line-length = 79
+max_cognitive_complexity = 12

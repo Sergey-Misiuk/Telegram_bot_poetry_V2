@@ -1,0 +1,36 @@
+[project]
+name = "project-poetry-club"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "Your Name",email = "you@example.com"}
+]
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi (>=0.115.8,<0.116.0)",
+    "uvicorn (>=0.34.0,<0.35.0)",
+    "sqlalchemy (>=2.0.38,<3.0.0)",
+    "asyncpg (>=0.30.0,<0.31.0)",
+    "alembic (>=1.14.1,<2.0.0)",
+    "python-dotenv (>=1.0.1,<2.0.0)",
+    "pydantic (>=2.10.6,<3.0.0)",
+    "beautifulsoup4 (>=4.13.3,<5.0.0)",
+    "httpx (>=0.28.1,<0.29.0)",
+    "lxml (>=5.3.1,<6.0.0)",
+    "pyjwt (>=2.10.1,<3.0.0)",
+    "aiogram (>=3.19.0,<4.0.0)"
+]
+
+[tool.poetry]
+packages = [{include = "project_poetry_club", from = "src"}]
+
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3.4"
+black = "^25.1.0"
+flake8 = "^7.1.2"
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
