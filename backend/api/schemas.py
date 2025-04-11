@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import List
+from typing import List, Any
 
 
 class PoemSchema(BaseModel):
@@ -21,10 +21,20 @@ class UserAuth(BaseModel):
     token: str
 
 
+class Order(BaseModel):
+    user_id: int
+    poem_id: int
+    status: str
+
+    class Config:
+        from_attributes = True
+
+
 class PoemDetailSchema(BaseModel):
     poem: PoemSchema
     is_favorite: bool
     is_author: bool
+    order: Order | None
 
 
 class FavouriteSchema(BaseModel):
@@ -69,4 +79,8 @@ class PersonalPoemSchema(BaseModel):
 
 class DelPersonalPoem(BaseModel):
     # tg_id: int
+    poem_id: int
+
+
+class PoemStatusUpdate(BaseModel):
     poem_id: int

@@ -1,7 +1,7 @@
 # from http.client import HTTPException
 from api import crud
-from api.services.parser_func import parser_poetry
-from api.services.user_service import verify_api_key
+from api.tools.parser_func import parser_poetry
+from api.tools.security import verify_api_key
 from fastapi import APIRouter, Depends, HTTPException
 from api.schemas import (
     PoemSchema,
@@ -10,13 +10,12 @@ from api.schemas import (
     PoemDetailSchema,
     FavoriteAddRequest,
     FavoriteDelRequest,
-    FavoritePoemsSchema,
     FavouriteSchema,
-    PersonalPoemSchema,
     PoemRequest,
     DelPersonalPoem,
+    PoemStatusUpdate,
 )
-from .models import Poem, User, RequestStatus
+from .models import User, RequestStatus
 from api.db.database import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -58,9 +57,7 @@ async def get_random_poem(
 ):
     random_poem = await parser_poetry()
     if random_poem is None:
-        raise HTTPException(
-            status_code=500, detail="Не удалось получить стихотворение"
-        )
+        raise HTTPException(status_code=500, detail="Не удалось получить стихотворение")
 
     # Проверяем, существует ли стих с таким названием в базе данных
     existing_poem = await crud.get_poem_by_title(
@@ -108,18 +105,16 @@ async def get_poem(
         raise HTTPException(status_code=404, detail="Стихотворение не найдено")
 
     user = await crud.get_user(db, request.tg_id, request.user_name)
-    is_favorite = await crud.exiting_favorite_poem_by_user(
-        db, user.id, request.poem_id
-    )
+    is_favorite = await crud.exiting_favorite_poem_by_user(db, user.id, request.poem_id)
 
-    personal_poem = await crud.get_personal_poem_by_id(
-        db, user.id, request.poem_id
-    )
+    personal_poem = await crud.get_personal_poem_by_id(db, user.id, request.poem_id)
+    order = await crud.get_personal_poem_by_status_and_id(db, poem_id=request.poem_id)
 
     return PoemDetailSchema(
         poem=poem,
         is_favorite=is_favorite is not None,
         is_author=personal_poem is not None,
+        order=order,
     )
 
 
@@ -141,12 +136,8 @@ async def delete_poem_to_favorite(
 
     if is_favorite:
         await crud.del_to_favorite(db, is_favorite)
-        return PoemDetailSchema(
-            poem=existing_poem, is_favorite=False, is_author=False
-        )
-    return PoemDetailSchema(
-        poem=existing_poem, is_favorite=True, is_author=False
-    )
+        return PoemDetailSchema(poem=existing_poem, is_favorite=False, is_author=False, order=None)
+    return PoemDetailSchema(poem=existing_poem, is_favorite=True, is_author=False, order=None)
 
 
 @router.post("/add_poem_to_favorite")
@@ -169,13 +160,9 @@ async def add_poem_to_favorite(
     )
 
     if is_favorite:
-        return PoemDetailSchema(
-            poem=existing_poem, is_favorite=False, is_author=False
-        )
+        return PoemDetailSchema(poem=existing_poem, is_favorite=False, is_author=False, order=None)
     await crud.add_to_favorite(db, user.id, existing_poem.id)
-    return PoemDetailSchema(
-        poem=existing_poem, is_favorite=True, is_author=False
-    )
+    return PoemDetailSchema(poem=existing_poem, is_favorite=True, is_author=False, order=None)
 
 
 @router.post("/add_personal_poem")
@@ -200,9 +187,7 @@ async def get_personal_poems(
     api_key: str = Depends(verify_api_key),
 ):
     existing_user = await crud.get_user(db, user.tg_id, user.name)
-    favorite_poems = await crud.get_personal_poems_by_user(
-        db, existing_user.id
-    )
+    favorite_poems = await crud.get_personal_poems_by_user(db, existing_user.id)
 
     if favorite_poems is None:
         return None
@@ -216,9 +201,7 @@ async def get_all_personal_poems(
     api_key: str = Depends(verify_api_key),
 ):
     existing_user = await crud.get_user(db, user.tg_id, user.name)
-    all_personal_poems = await crud.get_all_personal_poems(
-        db, existing_user.id
-    )
+    all_personal_poems = await crud.get_all_personal_poems(db, existing_user.id)
 
     if all_personal_poems is None:
         return None
@@ -245,8 +228,27 @@ async def get_request_statuses():
 
 @router.get("/orders_status_{status}")
 async def get_all_orders(
+    status: RequestStatus,
     db: AsyncSession = Depends(get_db),
     api_key: str = Depends(verify_api_key),
-
 ):
-    return "Succsess"
+    result = await crud.get_all_personal_poem_by_status(db, status=status)
+
+    if result is not None:
+        return {"data": result, "message": "Succsess"}
+    return {"data": result, "message": "Faild"}
+
+
+@router.post("/moderation/approve")
+async def approve_poem(data: PoemStatusUpdate, db: AsyncSession = Depends(get_db)):
+    return await crud.update_order_status(data.poem_id, "APPROVED", db)
+
+
+@router.post("/moderation/review")
+async def send_to_review(data: PoemStatusUpdate, db: AsyncSession = Depends(get_db)):
+    return await crud.update_order_status(data.poem_id, "PENDING", db)
+
+
+@router.post("/moderation/reject")
+async def reject_poem(data: PoemStatusUpdate, db: AsyncSession = Depends(get_db)):
+    return await crud.update_order_status(data.poem_id, "REJECTED", db)

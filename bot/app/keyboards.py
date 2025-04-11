@@ -4,7 +4,6 @@ from aiogram.types import (
     InlineKeyboardButton,
 )
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-from app.config.bot_config import ADMIN
 
 
 main = ReplyKeyboardMarkup(
@@ -58,7 +57,6 @@ async def get_favourite_button(
     if is_personal and is_author:
         keyboard.add(
             InlineKeyboardButton(
-                # text="🗑 Удалить стих", callback_data="delete_poem"
                 text="🗑 Удалить стих", callback_data=f"delete_poem_{poem_id}"
             )
         )
@@ -78,9 +76,12 @@ async def get_favourite_button(
 
 
 async def poems(
-    poems, page: int = 0, items_per_page: int = 5, category: str = "fav"
+    poems: list | dict, page: int = 0, items_per_page: int = 5, category: str = "fav"
 ):
     keyboard = InlineKeyboardBuilder()
+
+    if isinstance(poems, dict):
+        poems = poems['data']
 
     total_pages = (len(poems) - 1) // items_per_page + 1
     start_idx = page * items_per_page
@@ -145,4 +146,34 @@ async def status_keyboard(statuses):
                 callback_data=f"status_{status}"
             )
         )
+    return keyboard.adjust(1).as_markup()
+
+
+async def get_moderation_keyboard(status: str | None, poem_id: int):
+    keyboard = InlineKeyboardBuilder()
+
+    if status == 'На рассмотрении':
+        keyboard.add(
+            InlineKeyboardButton(text='✅ Одобрить', callback_data=f'approve:{poem_id}'),
+            InlineKeyboardButton(text='❌ Отклонить', callback_data=f'reject:{poem_id}')
+        )
+    elif status == 'Одобрено':
+        keyboard.add(
+            InlineKeyboardButton(text='🔄 На рассмотрение', callback_data=f'to_review:{poem_id}'),
+            InlineKeyboardButton(text='❌ Отклонить', callback_data=f'reject:{poem_id}')
+        )
+    elif status == 'Отклонено':
+        keyboard.add(
+            InlineKeyboardButton(text='✅ Одобрить', callback_data=f'approve:{poem_id}'),
+            InlineKeyboardButton(text='🔄 На рассмотрение', callback_data=f'to_review:{poem_id}')
+        )
+    elif status is None:
+        text = (
+            "🗑 Удалить из избранного"
+        )
+        callback_data = "del_favourite"
+        keyboard.add(
+            InlineKeyboardButton(text=text, callback_data=callback_data)
+        )
+
     return keyboard.adjust(1).as_markup()

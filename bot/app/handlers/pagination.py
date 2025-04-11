@@ -4,12 +4,13 @@ import app.keyboards as kb
 
 from app.config.bot_config import API_BASE_URL
 
-from app.handlers.handlers import headers as hd, timeout as time
+from app.config.bot_config import API_BASE_URL, TG_KEY_API
+
 
 router = Router()
 
-headers = hd
-timeout = time
+headers = {"api-key": TG_KEY_API}
+timeout = aiohttp.ClientTimeout(total=15, connect=10)
 
 
 @router.callback_query(lambda c: c.data.split("_")[0] in ["fav", "pers"])

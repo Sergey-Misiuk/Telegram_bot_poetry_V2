@@ -7,7 +7,7 @@ app = FastAPI()
 
 @app.on_event("startup")
 async def on_startup():
-    # Создаём таблицы при старте приложения
+
     await create_database()
 
 

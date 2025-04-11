@@ -3,10 +3,10 @@ import asyncio
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
-from app.middlewares import AccessMiddleware
+# from app.middlewares import AccessMiddleware
 
 from app.handlers import handlers, pagination
-from app.handlers.admin import admin_menu
+from app.handlers.admin import admin_handlers
 from app.handlers.user_handlers import create_poem, delete_poem
 from app.config.bot_config import BOT_TOKEN
 
@@ -16,7 +16,7 @@ from app.utils.commands import set_commands
 all_routers = [
     handlers.router,
     pagination.router,
-    admin_menu.router,
+    admin_handlers.router,
     create_poem.router,
     delete_poem.router,
 ]

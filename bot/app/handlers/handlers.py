@@ -1,15 +1,14 @@
 from aiogram import Router, F, types
 from aiogram.types import Message, CallbackQuery
-from aiogram.filters import CommandStart, Command
-from aiogram.fsm.context import FSMContext
+from aiogram.filters import Command
 from aiogram.exceptions import TelegramBadRequest
 
 import app.keyboards as kb
-import app.states.state as st
 import aiohttp
 import asyncio
 
 from app.config.bot_config import ADMIN, API_BASE_URL, TG_KEY_API
+import logging
 
 
 router = Router()
@@ -22,25 +21,18 @@ timeout = aiohttp.ClientTimeout(total=15, connect=10)
 async def cmd_start(message: Message):
     user_data = {
         "tg_id": message.from_user.id,
+        # "name": message.from_user.full_name,
         "name": message.from_user.full_name,
     }
     async with aiohttp.ClientSession(timeout=timeout) as session:
-        response = await session.post(
-            f"{API_BASE_URL}/set_tg_user", json=user_data
-        )
+        response = await session.post(f"{API_BASE_URL}/set_tg_user", json=user_data)
         if response.status != 200:
-            await message.answer(
-                f"Ошибка {response.status}.\n\nПопробуйте чуть позже"
-            )
+            await message.answer(f"Ошибка {response.status}.\n\nПопробуйте чуть позже")
         data = await response.json()
     if message.from_user.id == int(ADMIN):  # type: ignore
-        await message.answer(
-            f"Hi!\nAdmin {data['name']}", reply_markup=kb.admin_main
-        )
+        await message.answer(f"Hi!\nAdmin {data['name']}", reply_markup=kb.admin_main)
     else:
-        await message.answer(
-            "Hi!\nI'm a poetry telegram bot", reply_markup=kb.main
-        )
+        await message.answer("Hi!\nI'm a poetry telegram bot", reply_markup=kb.main)
 
 
 @router.message(Command("random_poem"))
@@ -49,9 +41,7 @@ async def random_poetry(message: Message):
     await message.answer("Подбираю для вас случайный стих...")
     try:
         async with aiohttp.ClientSession(timeout=timeout) as session:
-            response = await session.get(
-                f"{API_BASE_URL}/random_poem", headers=headers
-            )
+            response = await session.get(f"{API_BASE_URL}/random_poem", headers=headers)
             if response.status == 200:
                 data = await response.json()
                 await message.answer(
@@ -66,7 +56,8 @@ async def random_poetry(message: Message):
         await message.answer("Сервер долго не отвечает. Попробуйте позже.")
     except aiohttp.ClientError as e:
         await message.answer("Произошла ошибка соединения с сервером.")
-        print(f"ClientError: {e}")
+        logging.error(f"ERROR ❌ ClientError: {e}")
+
 
 # Авторские стихи
 @router.message(Command("personal_poems"))
@@ -162,7 +153,7 @@ async def add_poetry(callback: CallbackQuery):
     text = callback.message.text.split("\n")
     user_data = {
         "tg_id": callback.message.chat.id,
-        "user_name": callback.from_user.first_name,
+        "user_name": callback.from_user.full_name,
         "poem_author": text[0],
         "poem_title": text[2],
         "poem_text": "\n".join(text[4::]),
@@ -203,7 +194,8 @@ async def del_poetry(callback: CallbackQuery):
     text = callback.message.text.split("\n")
     user_data = {
         "tg_id": callback.message.chat.id,
-        "user_name": callback.from_user.first_name,
+        # "user_name": callback.from_user.first_name,
+        "user_name": callback.from_user.full_name,
         "poem_author": text[0],
         "poem_title": text[2],
     }
@@ -237,7 +229,7 @@ async def del_poetry(callback: CallbackQuery):
 @router.callback_query(F.data.startswith("poem_"))
 async def poem_info(callback: CallbackQuery):
     tg_id = callback.message.chat.id
-    user_name = callback.from_user.first_name
+    user_name = callback.from_user.full_name
     poem_id = callback.data.split("_")[1]
 
     try:
@@ -259,16 +251,22 @@ async def poem_info(callback: CallbackQuery):
             await callback.answer(
                 f"Ошибка {response.status}: не удалось получить стих."
             )
-            return
+            await callback.message.delete()
+
         await callback.answer("")
 
-        if isinstance(ADMIN, (int, str)):
-            if callback.message.chat.id == int(ADMIN) and data["poem"]["author"] == "Авторский":  # type: ignore[union-attr]
+        if int(tg_id) == int(ADMIN):
+            if data.get('order') is None:
                 await callback.message.answer(  # type: ignore[union-attr]
                     f"{data['poem']['author']}\n\n{data['poem']['title']}\n\n{data['poem']['text']}",
-                    reply_markup=await kb.del_poem(),
-                )
-                return
+                    reply_markup=await kb.get_moderation_keyboard(status=None, poem_id=poem_id),
+                ),
+            else:
+                await callback.message.answer(  # type: ignore[union-attr]
+                    f"{data['poem']['author']}\n\n{data['poem']['title']}\n\n{data['poem']['text']}",
+                    reply_markup=await kb.get_moderation_keyboard(data['order']['status'], data['order']['poem_id']),
+                ),
+        else:
             await callback.message.answer(  # type: ignore[union-attr]
                 f"{data['poem']['author']}\n\n{data['poem']['title']}\n\n{data['poem']['text']}",
                 reply_markup=await kb.get_favourite_button(
@@ -284,51 +282,14 @@ async def poem_info(callback: CallbackQuery):
             "Увы, вы не можете больше получить этот стих,\nон был удален. 😢"
         )
     except aiohttp.ClientConnectionError as e:
-        print(f"❌ Connection error: {e}")
-        await callback.message.answer(
-            "Ошибка соединения с сервером. Попробуйте позже."
-        )
+        logging.error(f"ERROR ❌ Connection error: {e}")
+        await callback.message.answer("Ошибка соединения с сервером. Попробуйте позже.")
     except aiohttp.ClientResponseError as e:
-        print(f"Response error: {e.status} {e.message}")
+        logging.error(f"ERROR ❌ Response error: {e.status} {e.message}")
     except asyncio.TimeoutError:
-        print("❌ Request timeout")
+        logging.error(f"ERROR ❌ Request timeout")
         await callback.message.answer("Сервер не отвечает. Попробуйте позже.")
     except RuntimeError as e:
-        print(f"❌ Runtime error: {e}")
-        await callback.message.answer(
-            "Произошла внутренняя ошибка. Попробуйте позже."
-        )
+        logging.error(f"ERROR ❌ Runtime error: {e}")
+        await callback.message.answer("Произошла внутренняя ошибка. Попробуйте позже.")
 
-
-# Доделать удаление стиха
-@router.callback_query(lambda c: c.data.startswith("delete_poem_"))
-async def del_poem(callback: CallbackQuery):
-    text = callback.message.text.split("\n")
-    poem_id = int(callback.data.split("_")[2])
-    print()
-    print(poem_id)
-    print()
-    print(callback.data)
-    print()
-    print()
-    print(text)
-    try:
-        async with aiohttp.ClientSession(timeout=timeout) as session:
-            response = await session.post(
-                f"{API_BASE_URL}/del_personal_poem",
-                headers=headers,
-                json={
-                    "poem_id": poem_id,
-                },
-                timeout=timeout,
-            )
-
-        if response.status == 200:
-            await callback.message.delete()
-            await callback.answer("Стих удален")
-        else:
-            await callback.answer(
-                f"Ошибка {response.status}: не удалось получить стих."
-            )
-    except:
-        return None

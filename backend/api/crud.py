@@ -1,7 +1,8 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from .models import Poem, User, Favourite, Order
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.future import select
+# from sqlalchemy.future import select, update
+from sqlalchemy import select, update
 from api.config import SECRET_KEY
 import jwt
 
@@ -14,9 +15,7 @@ async def create_poem(
     is_personal: bool = False,
 ):
     """Добавляет новый стих в базу данных."""
-    new_poem = Poem(
-        title=title, author=author, text=text, is_personal=is_personal
-    )
+    new_poem = Poem(title=title, author=author, text=text, is_personal=is_personal)
     db.add(new_poem)
     try:
         await db.commit()  # Асинхронный коммит изменений
@@ -103,6 +102,9 @@ async def add_to_favorite(db: AsyncSession, user_id: int, poem_id: int):
     await db.commit()
 
 
+# Orders
+
+
 async def add_to_orders(db: AsyncSession, user_id: int, poem_id: int):
     new_order = Order(user_id=user_id, poem_id=poem_id)
     db.add(new_order)
@@ -119,19 +121,15 @@ async def get_personal_poems_by_user(db: AsyncSession, user_id):
 
 async def get_all_personal_poems(db: AsyncSession, user_id):
     """Поиск, всех авторских стихов."""
-    stmt = select(Order).where(Order.user_id != user_id)
+    stmt = select(Order).where(Order.user_id != user_id, Order.status == "APPROVED")
 
     result = await db.execute(stmt)
     return result.scalars().all()
 
 
-async def get_personal_poem_by_id(
-    db: AsyncSession, user_id: int, poem_id: int
-):
+async def get_personal_poem_by_id(db: AsyncSession, user_id: int, poem_id: int):
     """Поиск, всех авторских стихов."""
-    stmt = select(Order).where(
-        Order.user_id == user_id, Order.poem_id == poem_id
-    )
+    stmt = select(Order).where(Order.user_id == user_id, Order.poem_id == poem_id)
 
     result = await db.execute(stmt)
     return result.scalar_one_or_none()
@@ -160,14 +158,53 @@ async def del_personal_poem(db: AsyncSession, poem_id: int):
 
 
 async def get_all_personal_poem_by_status(db: AsyncSession, status=None):
-    stmt = select(Order).where(Order.status.value == status)
-    
+    stmt = select(Order).where(Order.status == status)
+
     orders = await db.execute(stmt)
     result = orders.scalars().all()
-    
-    if result is not None:
-        return result
-    return None
+
+    if not result:
+        return None
+    return result
+
+
+async def get_personal_poem_by_status_and_id(
+    db: AsyncSession, status=None, poem_id=None
+):
+    stmt = select(Order).where(Order.poem_id == poem_id)
+
+    orders = await db.execute(stmt)
+    result = orders.scalar_one_or_none()
+
+    if not result:
+        return None
+    return result
+
+
+async def update_order_status(
+    poem_id: int,
+    new_status: str,
+    db: AsyncSession
+) -> Order | None:
+
+    stmt = select(Order).where(Order.poem_id == poem_id)
+    result = await db.execute(stmt)
+    order = result.scalar_one_or_none()
+
+    if order is None:
+        return None
+
+    update_stmt = (
+        update(Order)
+        .where(Order.poem_id == poem_id)
+        .values(status=new_status)
+        .execution_options(synchronize_session="fetch")
+    )
+    await db.execute(update_stmt)
+    await db.commit()
+
+    await db.refresh(order)
+    return order
 
 
 async def create_jwt(tg_id: int):
