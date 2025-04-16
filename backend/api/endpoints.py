@@ -21,12 +21,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 router = APIRouter()
 
 
-@router.get("/", summary="Тестовый эндпоинт")
+@router.get("/", summary="Тестовый эндпоинт", tags=["Test"])
 async def read_root() -> str:
     return "Тестовая проверка FastAPI"
 
 
-@router.post("/set_tg_user", summary="Регистрация пользователя")
+@router.post("/set_tg_user", summary="Регистрация пользователя", tags=["User"])
 async def set_tg_user(user: UserSchema, db: AsyncSession = Depends(get_db)):
     new_user = await crud.create_user(db, user.tg_id, user.name)
     return {
@@ -36,7 +36,7 @@ async def set_tg_user(user: UserSchema, db: AsyncSession = Depends(get_db)):
     }
 
 
-@router.get("/random_poem", response_model=PoemSchema, summary="Случайный стих")
+@router.get("/random_poem", response_model=PoemSchema, summary="Случайный стих", tags=["Poem"])
 async def get_random_poem(
     db: AsyncSession = Depends(get_db), api_key: str = Depends(verify_api_key)
 ):
@@ -62,7 +62,7 @@ async def get_random_poem(
     return new_poem
 
 
-@router.post("/favorite_poems", response_model=list[FavouriteSchema], summary="Список избранного")
+@router.post("/favorite_poems", response_model=list[FavouriteSchema], summary="Список избранного", tags=["Favorites"])
 async def get_fovorite_poems(
     user: UserSchema,
     db: AsyncSession = Depends(get_db),
@@ -74,7 +74,7 @@ async def get_fovorite_poems(
     return favorite_poems or []
 
 
-@router.post("/poems", response_model=PoemDetailSchema, summary="Получить конкретный стих")
+@router.post("/poems", response_model=PoemDetailSchema, summary="Получить конкретный стих", tags=["Poem"])
 async def get_poem(
     request: PoemRequest,
     db: AsyncSession = Depends(get_db),
@@ -98,7 +98,7 @@ async def get_poem(
     )
 
 
-@router.post("/favorite/remove", response_model=PoemDetailSchema, summary="Удалить из избранного")
+@router.post("/favorite/remove", response_model=PoemDetailSchema, summary="Удалить из избранного", tags=["Favorites"])
 async def delete_poem_to_favorite(
     request: FavoriteDelRequest,
     db: AsyncSession = Depends(get_db),
@@ -120,7 +120,7 @@ async def delete_poem_to_favorite(
     return PoemDetailSchema(poem=poem, is_favorite=True, is_author=False, order=None)
 
 
-@router.post("/favorite/add", response_model=PoemDetailSchema, summary="Добавить в избранное")
+@router.post("/favorite/add", response_model=PoemDetailSchema, summary="Добавить в избранное", tags=["Favorites"])
 async def add_poem_to_favorite(
     request: FavoriteAddRequest,
     db: AsyncSession = Depends(get_db),
@@ -145,7 +145,7 @@ async def add_poem_to_favorite(
     return PoemDetailSchema(poem=poem, is_favorite=True, is_author=False, order=None)
 
 
-@router.post("/add_personal_poem", summary="Добавить авторский стих")
+@router.post("/add_personal_poem", summary="Добавить авторский стих", tags=["Personal Poem"])
 async def add_personal_poem(
     user: UserSchema,
     poem: PoemSchema,
@@ -161,7 +161,7 @@ async def add_personal_poem(
     return {"message": "success", "data": result}
 
 
-@router.post("/get_user_personal_poems", summary="Авторские стихи пользователя")
+@router.post("/get_user_personal_poems", summary="Авторские стихи пользователя", tags=["Personal Poem"])
 async def get_personal_poems(
     user: UserSchema,
     db: AsyncSession = Depends(get_db),
@@ -173,7 +173,7 @@ async def get_personal_poems(
     return favorite_poems or []
 
 
-@router.post("/get_all_personal_poems", summary="Одобренные авторские стихи (без своих)")
+@router.post("/get_all_personal_poems", summary="Одобренные авторские стихи (без своих)", tags=["Personal Poem"])
 async def get_all_personal_poems(
     user: UserSchema,
     db: AsyncSession = Depends(get_db),
@@ -184,7 +184,7 @@ async def get_all_personal_poems(
     return await crud.get_all_approved_poems_excluding_user(db, existing_user.id)
 
 
-@router.post("/del_personal_poem", summary="Удалить авторский стих")
+@router.post("/del_personal_poem", summary="Удалить авторский стих", tags=["Personal Poem"])
 async def del_personal_poem(
     request: DelPersonalPoem,
     db: AsyncSession = Depends(get_db),
@@ -197,12 +197,12 @@ async def del_personal_poem(
 # Admin endpoint
 
 
-@router.get("/statuses")
+@router.get("/statuses", summary="Все возможные статусы запросов", tags=["Order"])
 async def get_request_statuses():
     return [status.value for status in RequestStatus]
 
 
-@router.get("/orders_status_{status}", summary="Все стихи по статусу")
+@router.get("/orders_status_{status}", summary="Все стихи по статусу", tags=["Order"])
 async def get_all_orders(
     status: RequestStatus,
     db: AsyncSession = Depends(get_db),
@@ -215,16 +215,16 @@ async def get_all_orders(
     return {"data": result, "message": "Faild"}
 
 
-@router.post("/moderation/approve")
+@router.post("/moderation/approve", summary="Одобрить стих", tags=["Moderation"])
 async def approve_poem(data: PoemStatusUpdate, db: AsyncSession = Depends(get_db)):
     return await crud.update_order_status(db, data.poem_id, "APPROVED")
 
 
-@router.post("/moderation/review")
+@router.post("/moderation/review", summary="Вернуть на рассмотрение", tags=["Moderation"])
 async def send_to_review(data: PoemStatusUpdate, db: AsyncSession = Depends(get_db)):
     return await crud.update_order_status(db, data.poem_id, "PENDING")
 
 
-@router.post("/moderation/reject")
+@router.post("/moderation/reject", summary="Отклонить стих", tags=["Moderation"])
 async def reject_poem(data: PoemStatusUpdate, db: AsyncSession = Depends(get_db)):
     return await crud.update_order_status(db, data.poem_id, "REJECTED")
