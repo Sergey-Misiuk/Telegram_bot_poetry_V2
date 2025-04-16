@@ -3,7 +3,6 @@ import asyncio
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
-# from app.middlewares import AccessMiddleware
 
 from app.handlers import handlers, pagination
 from app.handlers.admin import admin_handlers
@@ -27,9 +26,6 @@ async def main():
 
     dp = Dispatcher()
     
-    # dp.message.middleware(AccessMiddleware())
-    
-    # dp.include_routers(handlers.router, admin_menu.router)
     dp.include_routers(*all_routers)
     dp.startup.register(startup)
     dp.shutdown.register(shutdown)

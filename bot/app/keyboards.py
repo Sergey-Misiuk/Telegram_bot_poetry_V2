@@ -19,7 +19,6 @@ main = ReplyKeyboardMarkup(
 )
 
 
-
 admin_main = ReplyKeyboardMarkup(
     keyboard=[
         [KeyboardButton(text="📜 Случайный стих")],
@@ -50,7 +49,7 @@ async def get_favourite_button(
     is_favorite: bool = False,
     is_personal: bool = False,
     is_author: bool = False,
-    poem_id: int = None
+    poem_id: int | None = None
 ):
     keyboard = InlineKeyboardBuilder()
 
@@ -152,17 +151,17 @@ async def status_keyboard(statuses):
 async def get_moderation_keyboard(status: str | None, poem_id: int):
     keyboard = InlineKeyboardBuilder()
 
-    if status == 'На рассмотрении':
+    if status == 'PENDING':
         keyboard.add(
             InlineKeyboardButton(text='✅ Одобрить', callback_data=f'approve:{poem_id}'),
             InlineKeyboardButton(text='❌ Отклонить', callback_data=f'reject:{poem_id}')
         )
-    elif status == 'Одобрено':
+    elif status == 'APPROVED':
         keyboard.add(
             InlineKeyboardButton(text='🔄 На рассмотрение', callback_data=f'to_review:{poem_id}'),
             InlineKeyboardButton(text='❌ Отклонить', callback_data=f'reject:{poem_id}')
         )
-    elif status == 'Отклонено':
+    elif status == 'REJECTED':
         keyboard.add(
             InlineKeyboardButton(text='✅ Одобрить', callback_data=f'approve:{poem_id}'),
             InlineKeyboardButton(text='🔄 На рассмотрение', callback_data=f'to_review:{poem_id}')

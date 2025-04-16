@@ -80,7 +80,7 @@
 from backend.api.db.database import Base
 from sqlalchemy.ext.asyncio import async_engine_from_config
 from alembic import context
-from backend.api.db.database import engine
+# from backend.api.db.database import engine
 
 config = context.config
 target_metadata = Base.metadata

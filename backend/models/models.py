@@ -23,7 +23,7 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
     create_async_engine,
 )
-from api.config import DB_URL
+from core.config import DB_URL
 
 
 engine = create_async_engine(
@@ -45,9 +45,9 @@ updated_at = Annotated[
 
 
 class RequestStatus(PyEnum):
-    PENDING = "На рассмотрении"
-    REJECTED = "Отклонено"
-    APPROVED = "Одобрено"
+    PENDING = "PENDING"
+    REJECTED = "REJECTED"
+    APPROVED = "APPROVED"
 
 
 class Base(AsyncAttrs, DeclarativeBase):
@@ -139,7 +139,6 @@ class Order(Base):
         lazy="joined",
         passive_deletes=True,
     )
-    # user = relationship("User", back_populates="requests_order")
 
     def __repr__(self):
         return (

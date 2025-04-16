@@ -1,38 +1,7 @@
-# Используем официальный Python-образ
-ARG PYTHON_VERSION=3.11.3
+# backend/dockerfile
+FROM poetry_base
 
-FROM python:${PYTHON_VERSION}-alpine3.18
+WORKDIR /app/backend
+COPY ./backend ./
 
-# Устанавливаем рабочую директорию
-WORKDIR /app/api
-# WORKDIR /app
-# WORKDIR /backend
-
-# Копируем файлы зависимостей
-# COPY pyproject.toml poetry.lock ./
-# COPY pyproject.toml poetry.lock ./app/
-COPY ./pyproject.toml ./poetry.lock ../
-# COPY . .
-
-# Устанавливаем Poetry и зависимости
-RUN pip install --no-cache-dir poetry && \
-    poetry config virtualenvs.create false && \
-    poetry install --no-root --no-interaction --no-ansi
-
-# Копируем исходный код API
-COPY ./backend/api ./
-
-ENV PYTHONPATH=/app
-ENV PYTHONUNBUFFERED=1
-
-
-# COPY . .
-# Открываем порт для API
-EXPOSE 8000
-
-# Запускаем FastAPI через Uvicorn
-# ENTRYPOINT ["poetry", "run", "uvicorn", "backend.api.main:app"]
-# CMD ["--host", "0.0.0.0", "--port", "8000"]
-# ENTRYPOINT ["sh", "./docker-entrypoint.sh"]
-# CMD ["poetry", "run", "uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
-CMD ["poetry", "run", "uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["poetry", "run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

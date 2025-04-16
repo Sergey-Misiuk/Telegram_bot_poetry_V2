@@ -1,12 +1,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
-from api.config import DB_URL
-
-
-# Eсли бы .env был бы в той же папке
-# dotenv_path = join(dirname(__file__), ".env")
-# load_dotenv(dotenv_path)
-
+from core.config import DB_URL
 
 if not DB_URL:
     raise ValueError("DATABASE_URL не установлен в .env файле")

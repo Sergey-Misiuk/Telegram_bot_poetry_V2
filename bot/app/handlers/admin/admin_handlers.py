@@ -77,7 +77,7 @@ async def handle_status_selection(callback: CallbackQuery):
         else:
             await callback.message.answer("Ошибка: API вернул некорректный статус.")
 
-        if data["data"] is not None:
+        if data["data"]:
             keyboard = await kb.poems(data, page=0, category="pers")
             await callback.message.answer("Есть стихи", reply_markup=keyboard)
         else:
@@ -167,6 +167,10 @@ async def handle_reject(callback: CallbackQuery):
     except ClientConnectorError:
         await callback.message.answer(
             "Ошибка подключения к API. Проверьте, запущен ли сервис."
+        )
+    except UnboundLocalError:
+        await callback.message.answer(
+            "Ошибка подключения к API."
         )
 
 

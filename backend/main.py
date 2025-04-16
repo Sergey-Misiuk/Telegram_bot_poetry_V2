@@ -1,4 +1,4 @@
-from api.models import create_database
+from models.models import create_database
 from fastapi import FastAPI
 from api.endpoints import router as poem_router
 

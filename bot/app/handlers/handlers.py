@@ -1,4 +1,4 @@
-from aiogram import Router, F, types
+from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery
 from aiogram.filters import Command
 from aiogram.exceptions import TelegramBadRequest
@@ -21,7 +21,6 @@ timeout = aiohttp.ClientTimeout(total=15, connect=10)
 async def cmd_start(message: Message):
     user_data = {
         "tg_id": message.from_user.id,
-        # "name": message.from_user.full_name,
         "name": message.from_user.full_name,
     }
     async with aiohttp.ClientSession(timeout=timeout) as session:
@@ -35,6 +34,7 @@ async def cmd_start(message: Message):
         await message.answer("Hi!\nI'm a poetry telegram bot", reply_markup=kb.main)
 
 
+# Случайный стих
 @router.message(Command("random_poem"))
 @router.message(F.text.endswith("Случайный стих"))
 async def random_poetry(message: Message):
@@ -59,7 +59,7 @@ async def random_poetry(message: Message):
         logging.error(f"ERROR ❌ ClientError: {e}")
 
 
-# Авторские стихи
+# Список авторских стихов
 @router.message(Command("personal_poems"))
 @router.message(F.text.endswith("Список ваших авторских стихов"))
 async def get_personal_poetry(message: Message):
@@ -91,6 +91,7 @@ async def get_personal_poetry(message: Message):
         )
 
 
+# Авторские стихи других пользователей (если status = APPOVED)
 @router.message(F.text.endswith("Авторские стихи"))
 async def get_all_personal_poetry(message: Message):
     user_data = {
@@ -121,6 +122,7 @@ async def get_all_personal_poetry(message: Message):
         )
 
 
+# Список избранных стихов
 @router.message(Command("selected_poems"))
 @router.message(F.text.endswith("Список избранных стихов"))
 async def get_all_poetry(message: Message):
@@ -134,7 +136,8 @@ async def get_all_poetry(message: Message):
         )
         if response.status == 200:
             data = await response.json()
-
+        else:
+            await message.answer("Ошибка")
     keyboard = await kb.poems(data, page=0, category="fav")
     if keyboard.inline_keyboard:
         await message.answer(
@@ -148,6 +151,7 @@ async def get_all_poetry(message: Message):
         )
 
 
+# Добавление в избранные
 @router.callback_query(F.data == "to_favourite")
 async def add_poetry(callback: CallbackQuery):
     text = callback.message.text.split("\n")
@@ -162,7 +166,7 @@ async def add_poetry(callback: CallbackQuery):
     try:
         async with aiohttp.ClientSession(timeout=timeout) as session:
             response = await session.post(
-                f"{API_BASE_URL}/add_poem_to_favorite",
+                f"{API_BASE_URL}/favorite/add",
                 headers=headers,
                 json=user_data,
                 timeout=timeout,
@@ -178,10 +182,7 @@ async def add_poetry(callback: CallbackQuery):
         new_markup = await kb.get_favourite_button(data["is_favorite"])
         if callback.message.reply_markup != new_markup:
             await callback.message.edit_reply_markup(reply_markup=new_markup)
-        # await callback.message.edit_reply_markup(
-        # reply_markup=await kb.get_favourite_button(data["is_favorite"])
-        # )  # type: ignore[union-attr]
-    # except AttributeError:
+
     except (AttributeError, TelegramBadRequest):
         await callback.message.answer("Увы, вы не можете еще раз добавить этот стих. ❌")  # type: ignore[union-attr]
         await callback.message.delete()
@@ -189,12 +190,12 @@ async def add_poetry(callback: CallbackQuery):
         return None
 
 
+# Удаление из избранных
 @router.callback_query(F.data == "del_favourite")
 async def del_poetry(callback: CallbackQuery):
     text = callback.message.text.split("\n")
     user_data = {
         "tg_id": callback.message.chat.id,
-        # "user_name": callback.from_user.first_name,
         "user_name": callback.from_user.full_name,
         "poem_author": text[0],
         "poem_title": text[2],
@@ -202,7 +203,7 @@ async def del_poetry(callback: CallbackQuery):
     try:
         async with aiohttp.ClientSession(timeout=timeout) as session:
             response = await session.post(
-                f"{API_BASE_URL}/del_poem_to_favorite",
+                f"{API_BASE_URL}/favorite/remove",
                 headers=headers,
                 json=user_data,
                 timeout=timeout,
@@ -218,7 +219,6 @@ async def del_poetry(callback: CallbackQuery):
         new_markup = await kb.get_favourite_button(data["is_favorite"])
         if callback.message.reply_markup != new_markup:
             await callback.message.edit_reply_markup(reply_markup=new_markup)
-    # except:
     except (AttributeError, TelegramBadRequest):
         await callback.message.answer("Этот стих отсутсвует у вас в избранных. 😢")  # type: ignore[union-attr]
         await callback.message.delete()  # type: ignore[union-attr]
@@ -226,6 +226,7 @@ async def del_poetry(callback: CallbackQuery):
         return None
 
 
+# Получение стихотворение
 @router.callback_query(F.data.startswith("poem_"))
 async def poem_info(callback: CallbackQuery):
     tg_id = callback.message.chat.id
@@ -244,38 +245,38 @@ async def poem_info(callback: CallbackQuery):
                 },
                 timeout=timeout,
             )
-
+        data = None
         if response.status == 200:
             data = await response.json()
+            await callback.answer("")
+            
+            if int(tg_id) == int(ADMIN):
+                if data.get('order') is None:
+                    await callback.message.answer(  # type: ignore[union-attr]
+                        f"{data['poem']['author']}\n\n{data['poem']['title']}\n\n{data['poem']['text']}",
+                        reply_markup=await kb.get_moderation_keyboard(status=None, poem_id=poem_id),
+                    ),
+                else:
+                    await callback.message.answer(  # type: ignore[union-attr]
+                        f"{data['poem']['author']}\n\n{data['poem']['title']}\n\n{data['poem']['text']}",
+                        reply_markup=await kb.get_moderation_keyboard(data['order']['status'], data['order']['poem_id']),
+                    ),
+            else:
+                await callback.message.answer(  # type: ignore[union-attr]
+                    f"{data['poem']['author']}\n\n{data['poem']['title']}\n\n{data['poem']['text']}",
+                    reply_markup=await kb.get_favourite_button(
+                        data["is_favorite"],
+                        data["poem"]["is_personal"],
+                        data["is_author"],
+                        poem_id=poem_id,
+                    ),
+                ),
+
         else:
             await callback.answer(
                 f"Ошибка {response.status}: не удалось получить стих."
             )
             await callback.message.delete()
-
-        await callback.answer("")
-
-        if int(tg_id) == int(ADMIN):
-            if data.get('order') is None:
-                await callback.message.answer(  # type: ignore[union-attr]
-                    f"{data['poem']['author']}\n\n{data['poem']['title']}\n\n{data['poem']['text']}",
-                    reply_markup=await kb.get_moderation_keyboard(status=None, poem_id=poem_id),
-                ),
-            else:
-                await callback.message.answer(  # type: ignore[union-attr]
-                    f"{data['poem']['author']}\n\n{data['poem']['title']}\n\n{data['poem']['text']}",
-                    reply_markup=await kb.get_moderation_keyboard(data['order']['status'], data['order']['poem_id']),
-                ),
-        else:
-            await callback.message.answer(  # type: ignore[union-attr]
-                f"{data['poem']['author']}\n\n{data['poem']['title']}\n\n{data['poem']['text']}",
-                reply_markup=await kb.get_favourite_button(
-                    data["is_favorite"],
-                    data["poem"]["is_personal"],
-                    data["is_author"],
-                    poem_id=poem_id,
-                ),
-            ),
 
     except AttributeError:
         await callback.message.answer(
@@ -292,4 +293,3 @@ async def poem_info(callback: CallbackQuery):
     except RuntimeError as e:
         logging.error(f"ERROR ❌ Runtime error: {e}")
         await callback.message.answer("Произошла внутренняя ошибка. Попробуйте позже.")
-

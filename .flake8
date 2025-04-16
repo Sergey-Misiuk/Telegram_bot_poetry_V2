@@ -1,0 +1,10 @@
+[flake8]
+ignore = E501,W293,S101,B101,W503,JS102,EXE002
+max-line-length = 79
+max_cognitive_complexity = 12
+exclude =
+    .artifacts
+    .git
+    .idea
+    .local
+    .vscode
