@@ -22,7 +22,6 @@ router = Router()
 
 headers = {"api-key": TG_KEY_API}
 timeout = aiohttp.ClientTimeout(total=15, connect=10)
-# from app.handlers.handlers import router
 
 
 async def fetch_statuses_from_api():
@@ -36,7 +35,6 @@ async def fetch_statuses_from_api():
 
 
 @router.message(IsAdmin(), F.text.endswith("Админ панель"))
-# @router.message(F.text.endswith("Админ панель"))
 async def admin(message: Message):
     keyboard = kb.admin_panel
 
@@ -44,15 +42,55 @@ async def admin(message: Message):
 
 
 @router.message(IsAdmin(), F.text.endswith("На главную"))
-# @router.message(F.text.endswith("На главную"))
 async def to_main_page(message: Message):
     keyboard = kb.admin_main
 
     await message.answer("Переход в главное меню", reply_markup=keyboard)
 
 
+@router.message(IsAdmin(), F.text.endswith("Статистика количество пользователей"))
+async def request_count_users(message: Message):
+
+    try:
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            response = await session.get(
+                f"{API_BASE_URL}/users/count",
+                headers=headers,
+                timeout=timeout,
+                params=None,
+            )
+
+        if response.status == 200:
+            data = await response.json()
+            await message.answer(f"Общее колличество пользователей - {data}")
+        else:
+            await message.answer("Ошибка: API вернул некорректный статус.")
+
+    except ClientConnectorError:
+        await message.answer(
+            "Ошибка подключения к API. Проверьте, запущен ли сервис."
+        )
+
+    except ServerTimeoutError:
+        await message.answer(
+            "Сервер не ответил вовремя. Повторите попытку позже."
+        )
+
+    except ClientResponseError as e:
+        await message.answer(f"Ошибка ответа от API: {e.status}")
+
+    except asyncio.TimeoutError:
+        await message.answer("Превышено время ожидания ответа от API.")
+
+    except ClientError as e:
+        await message.answer(f"Ошибка при запросе: {str(e)}")
+
+    except Exception as e:
+        await message.answer("Произошла неизвестная ошибка.")
+        logging.error(f"ERROR {e}")
+
+
 @router.message(IsAdmin(), F.text.endswith("Запросы на авторские стихи"))
-# @router.message(F.text.endswith("Запросы на авторские стихи"))
 async def request_order_by_status(message: Message):
     statuses = await fetch_statuses_from_api()
     keyboard = await kb.status_keyboard(statuses)

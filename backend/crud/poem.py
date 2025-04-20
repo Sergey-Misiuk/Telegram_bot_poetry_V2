@@ -1,9 +1,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from models.models import Poem, User, Favourite, Order
+from models.models import Poem
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy import select, update
-from sqlalchemy.orm import joinedload
-from typing import List, Optional
+from sqlalchemy import select
 
 
 async def create_poem(
@@ -57,7 +55,7 @@ async def get_poem_by_poem_id(db: AsyncSession, poem_id: int) -> Poem | None:
     return poem
 
 
-async def del_personal_poem(db: AsyncSession, poem_id: int):
+async def del_personal_poem(db: AsyncSession, poem_id: int) -> bool:
     """Удалить авторский стих."""
     stmt = select(Poem).where(Poem.id == poem_id)
 

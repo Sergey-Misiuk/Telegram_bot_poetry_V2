@@ -71,9 +71,9 @@ class PoemStatusUpdate(BaseModel):
 
 
 class OrderSchema(BaseModel):
-    id: int
-    user_id: int
-    poem_id: int
+    id: int = Field(None, example="1")
+    user_id: int = Field(..., example="1")
+    poem_id: int = Field(..., example="1")
     status: RequestStatus
 
     class Config:
@@ -91,8 +91,8 @@ class OrderSchema(BaseModel):
 
 class PoemDetailSchema(BaseModel):
     poem: PoemSchema
-    is_favorite: bool
-    is_author: bool
+    is_favorite: Optional[bool] = Field(default=False)
+    is_author: Optional[bool] = Field(default=False)
     order: Optional[OrderSchema] = None
 
     class Config:

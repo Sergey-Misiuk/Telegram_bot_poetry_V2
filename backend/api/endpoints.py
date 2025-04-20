@@ -1,4 +1,3 @@
-# from http.client import HTTPException
 import crud
 from api.utils.parser_func import parser_poetry
 from api.utils.security import verify_api_key
@@ -17,6 +16,7 @@ from schemas.schemas import (
 from models.models import RequestStatus
 from db.database import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
+
 
 router = APIRouter()
 
@@ -216,15 +216,36 @@ async def get_all_orders(
 
 
 @router.post("/moderation/approve", summary="Одобрить стих", tags=["Moderation"])
-async def approve_poem(data: PoemStatusUpdate, db: AsyncSession = Depends(get_db)):
+async def approve_poem(
+    data: PoemStatusUpdate,
+    db: AsyncSession = Depends(get_db),
+    api_key: str = Depends(verify_api_key),
+):
     return await crud.update_order_status(db, data.poem_id, "APPROVED")
 
 
-@router.post("/moderation/review", summary="Вернуть на рассмотрение", tags=["Moderation"])
-async def send_to_review(data: PoemStatusUpdate, db: AsyncSession = Depends(get_db)):
+@router.post(
+    "/moderation/review", summary="Вернуть на рассмотрение", tags=["Moderation"]
+)
+async def send_to_review(
+    data: PoemStatusUpdate,
+    db: AsyncSession = Depends(get_db),
+    api_key: str = Depends(verify_api_key),
+):
     return await crud.update_order_status(db, data.poem_id, "PENDING")
 
 
 @router.post("/moderation/reject", summary="Отклонить стих", tags=["Moderation"])
-async def reject_poem(data: PoemStatusUpdate, db: AsyncSession = Depends(get_db)):
+async def reject_poem(
+    data: PoemStatusUpdate,
+    db: AsyncSession = Depends(get_db),
+    api_key: str = Depends(verify_api_key),
+):
     return await crud.update_order_status(db, data.poem_id, "REJECTED")
+
+
+@router.get("/users/count", summary="Колличество пользователей", tags=["User"])
+async def count_users(
+    db: AsyncSession = Depends(get_db), api_key: str = Depends(verify_api_key)
+):
+    return await crud.get_count_users(db)

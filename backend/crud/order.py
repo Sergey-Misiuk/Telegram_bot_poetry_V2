@@ -1,7 +1,5 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
-from sqlalchemy.orm import joinedload
-from sqlalchemy.exc import SQLAlchemyError
 from typing import List, Optional
 
 from models.models import Order

@@ -1,6 +1,5 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from models.models import Favourite
-from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload
 from typing import List, Optional

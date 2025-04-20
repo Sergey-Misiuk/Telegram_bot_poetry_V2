@@ -1,9 +1,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from models.models import Poem, User, Favourite, Order
-from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy import select, update
-from sqlalchemy.orm import joinedload
-from typing import List, Optional
+from models.models import User
+from sqlalchemy import select, func
 
 
 async def create_user(db: AsyncSession, user_id: int, name: str) -> User:
@@ -22,3 +19,10 @@ async def get_user(db: AsyncSession, tg_id: int, name: str) -> User | None:
     stmt = select(User).where(User.tg_id == tg_id, User.name == name)
     result = await db.execute(stmt)
     return result.scalar_one_or_none()
+
+
+async def get_count_users(db: AsyncSession) -> int:
+    """Взвразает, колличество User в базе данных."""
+    stmt = select(func.count(User.id))
+    result = await db.execute(stmt)
+    return result.scalar() or 0

@@ -2,9 +2,7 @@ from aiogram import Router, types
 import aiohttp
 import app.keyboards as kb
 
-from app.config.bot_config import API_BASE_URL
-
-from app.config.bot_config import API_BASE_URL, TG_KEY_API
+from app.config.bot_config import API_BASE_URL, TG_KEY_API, API_BASE_URL
 
 
 router = Router()
