@@ -45,7 +45,7 @@ admin_panel = ReplyKeyboardMarkup(
 )
 
 
-async def get_favourite_button(
+def get_favourite_button(
     is_favorite: bool = False,
     is_personal: bool = False,
     is_author: bool = False,
@@ -74,7 +74,7 @@ async def get_favourite_button(
     return keyboard.adjust(1).as_markup()
 
 
-async def poems(
+def poems(
     poems: list | dict, page: int = 0, items_per_page: int = 5, category: str = "fav"
 ):
     keyboard = InlineKeyboardBuilder()
@@ -125,7 +125,7 @@ async def poems(
     return keyboard.adjust(1).as_markup()
 
 
-async def del_poem():
+def del_poem():
     keyboard = InlineKeyboardBuilder()
 
     keyboard.add(
@@ -135,7 +135,7 @@ async def del_poem():
     return keyboard.adjust(1).as_markup()
 
 
-async def status_keyboard(statuses):
+def status_keyboard(statuses):
     keyboard = InlineKeyboardBuilder()
 
     for status in statuses:
@@ -148,20 +148,20 @@ async def status_keyboard(statuses):
     return keyboard.adjust(1).as_markup()
 
 
-async def get_moderation_keyboard(status: str | None, poem_id: int):
+def get_moderation_keyboard(status: str | None, poem_id: int):
     keyboard = InlineKeyboardBuilder()
 
-    if status == 'PENDING':
+    if status == 'На расмотрении':
         keyboard.add(
             InlineKeyboardButton(text='✅ Одобрить', callback_data=f'approve:{poem_id}'),
             InlineKeyboardButton(text='❌ Отклонить', callback_data=f'reject:{poem_id}')
         )
-    elif status == 'APPROVED':
+    elif status == 'Одобрен':
         keyboard.add(
             InlineKeyboardButton(text='🔄 На рассмотрение', callback_data=f'to_review:{poem_id}'),
             InlineKeyboardButton(text='❌ Отклонить', callback_data=f'reject:{poem_id}')
         )
-    elif status == 'REJECTED':
+    elif status == 'Отклонён':
         keyboard.add(
             InlineKeyboardButton(text='✅ Одобрить', callback_data=f'approve:{poem_id}'),
             InlineKeyboardButton(text='🔄 На рассмотрение', callback_data=f'to_review:{poem_id}')

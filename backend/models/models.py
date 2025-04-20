@@ -45,9 +45,12 @@ updated_at = Annotated[
 
 
 class RequestStatus(PyEnum):
-    PENDING = "PENDING"
-    REJECTED = "REJECTED"
-    APPROVED = "APPROVED"
+    PENDING = "На расмотрении"
+    REJECTED = "Отклонён"
+    APPROVED = "Одобрен"
+    # PENDING = "PENDING"
+    # REJECTED = "REJECTED"
+    # APPROVED = "APPROVED"
 
 
 class Base(AsyncAttrs, DeclarativeBase):

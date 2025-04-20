@@ -43,6 +43,6 @@ async def change_page(callback: types.CallbackQuery):
                 "Ошибка при загрузке данных", show_alert=True
             )
 
-    keyboard = await kb.poems(data, page=page, category=category)
+    keyboard = kb.poems(data, page=page, category=category)
     await callback.message.edit_reply_markup(reply_markup=keyboard)
     await callback.answer()

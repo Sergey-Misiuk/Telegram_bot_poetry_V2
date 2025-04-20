@@ -248,4 +248,5 @@ async def reject_poem(
 async def count_users(
     db: AsyncSession = Depends(get_db), api_key: str = Depends(verify_api_key)
 ):
-    return await crud.get_count_users(db)
+    count = await crud.get_count_users(db)
+    return {"count": count}

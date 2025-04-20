@@ -2,6 +2,7 @@ from aiogram import F, Router
 from aiogram.types import Message
 from aiogram.fsm.context import FSMContext
 import aiohttp
+import logging
 
 from app.config.bot_config import API_BASE_URL, TG_KEY_API
 
@@ -29,7 +30,8 @@ async def add_poem(message: Message, state: FSMContext):
 
 После добавления ваш стих будет отправлен на рассмотрение
 администратору бота (это необходимо для фильтрации
-отправленых стихов, вы сможете видить статус вашего стиха,
+отправленых стихов, вы сможете видить статус вашего стиха
+нажав на /personal_poems
 в случае одобрения он появится в разделе 'Список авторских стихов')"""
     )
     await message.answer("Этап №1.\nВведите название стихотворения")
@@ -73,12 +75,15 @@ async def add_poem_three(message: Message, state: FSMContext):
                 f"{API_BASE_URL}/add_personal_poem",
                 headers=headers,
                 json=user_data,
-                timeout=timeout,
             )
 
-        if response.status == 200:
-            data = await response.json()
-            await message.answer("Стих отправлен на расмотрение")
-    except:
-        await message.answer("Произошла ошибка")
-        return None
+            if response.status == 200:
+                await message.answer("✅ Стих успешно отправлен на рассмотрение.")
+            else:
+                logging.warning(f"Ошибка API: {response.status}")
+                await message.answer("❌ Не удалось отправить стих. Попробуйте позже.")
+    except Exception as e:
+        logging.error(f"Ошибка при отправке стиха: {e}")
+        await message.answer("Произошла внутренняя ошибка. Попробуйте позже.")
+    finally:
+        await state.clear()

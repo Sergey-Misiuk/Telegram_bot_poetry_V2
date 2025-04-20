@@ -4,17 +4,12 @@ from aiogram.filters import Command
 from aiogram.exceptions import TelegramBadRequest
 
 import app.keyboards as kb
-import aiohttp
-import asyncio
-
-from app.config.bot_config import ADMIN, API_BASE_URL, TG_KEY_API
-import logging
+from app.config.bot_config import ADMIN, API_BASE_URL, HEADERS, TIMEOUT
+from app.utils.api_helpers import get_to_api, post_to_api
+from app.exception import handle_api_errors
 
 
 router = Router()
-
-headers = {"api-key": TG_KEY_API}
-timeout = aiohttp.ClientTimeout(total=15, connect=10)
 
 
 @router.message(Command("start"))
@@ -23,176 +18,116 @@ async def cmd_start(message: Message):
         "tg_id": message.from_user.id,
         "name": message.from_user.full_name,
     }
-    async with aiohttp.ClientSession(timeout=timeout) as session:
-        response = await session.post(f"{API_BASE_URL}/set_tg_user", json=user_data)
-        if response.status != 200:
-            await message.answer(f"Ошибка {response.status}.\n\nПопробуйте чуть позже")
-        data = await response.json()
+    url = f"{API_BASE_URL}/set_tg_user"
+    data = await post_to_api(url, data=user_data, headers=HEADERS, timeout=TIMEOUT)
+
+    if not data:
+        return await message.answer("Произошла ошибка. Попробуйте позже.")
+
     if message.from_user.id == int(ADMIN):  # type: ignore
         await message.answer(f"Hi!\nAdmin {data['name']}", reply_markup=kb.admin_main)
     else:
         await message.answer("Hi!\nI'm a poetry telegram bot", reply_markup=kb.main)
 
 
-# Случайный стих
 @router.message(Command("random_poem"))
 @router.message(F.text.endswith("Случайный стих"))
 async def random_poetry(message: Message):
     await message.answer("Подбираю для вас случайный стих...")
+
+    url = f"{API_BASE_URL}/random_poem"
+    data = await get_to_api(url, headers=HEADERS, timeout=TIMEOUT)
+
     try:
-        async with aiohttp.ClientSession(timeout=timeout) as session:
-            response = await session.get(f"{API_BASE_URL}/random_poem", headers=headers)
-            if response.status == 200:
-                data = await response.json()
-                await message.answer(
-                    f"{data['author']}\n\n{data['title']}\n\n{data['text']}",
-                    reply_markup=await kb.get_favourite_button(),
-                )
-            else:
-                await message.answer(
-                    f"Ошибка {response.status}.\n\nПопробуйте чуть позже"
-                )
-    except asyncio.TimeoutError:
-        await message.answer("Сервер долго не отвечает. Попробуйте позже.")
-    except aiohttp.ClientError as e:
-        await message.answer("Произошла ошибка соединения с сервером.")
-        logging.error(f"ERROR ❌ ClientError: {e}")
-
-
-# Список авторских стихов
-@router.message(Command("personal_poems"))
-@router.message(F.text.endswith("Список ваших авторских стихов"))
-async def get_personal_poetry(message: Message):
-    user_data = {
-        "tg_id": message.from_user.id,
-        "name": message.from_user.full_name,
-    }
-    async with aiohttp.ClientSession(timeout=timeout) as session:
-        response = await session.post(
-            f"{API_BASE_URL}/get_user_personal_poems",
-            headers=headers,
-            json=user_data,
-        )
-        if response.status == 200:
-            data = await response.json()
+        if data:
+            await message.answer(
+                f"{data['author']}\n\n{data['title']}\n\n{data['text']}",
+                reply_markup=kb.get_favourite_button(),
+            )
         else:
-            return await message.answer("Ошибка при загрузке данных")
+            return await message.answer("Ошибка при получении стиха. Попробуйте позже.")
+    except Exception as e:
+        await handle_api_errors(message, e)
 
-    keyboard = await kb.poems(data, page=0, category="pers")
+
+@router.message(Command("personal_poems"))
+@router.message(F.text.endswith("Список ваших авторских стихов") | (F.text == "/Мои стихи"))
+async def get_personal_poetry(message: Message):
+    user_data = {"tg_id": message.from_user.id, "name": message.from_user.full_name}
+
+    url = f"{API_BASE_URL}/get_user_personal_poems"
+    data = await post_to_api(url, data=user_data, headers=HEADERS, timeout=TIMEOUT)
+
+    keyboard = kb.poems(data or [], page=0, category="pers")
     if keyboard.inline_keyboard:
-        await message.answer(
-            "Список ваших авторских стихов!",
-            reply_markup=keyboard,
-        )
+        await message.answer("Список ваших авторских стихов!", reply_markup=keyboard)
     else:
-        await message.answer(
-            "Пока здесь нет ваших авторских стихов\nДобавьте свой стих.",
-            reply_markup=keyboard,
-        )
+        await message.answer("Пока нет авторских стихов. Добавьте свой стих.", reply_markup=keyboard)
 
 
-# Авторские стихи других пользователей (если status = APPOVED)
 @router.message(F.text.endswith("Авторские стихи"))
 async def get_all_personal_poetry(message: Message):
     user_data = {
         "tg_id": message.from_user.id,
-        "name": message.from_user.full_name,
+        "name": message.from_user.full_name
     }
-    async with aiohttp.ClientSession(timeout=timeout) as session:
-        response = await session.post(
-            f"{API_BASE_URL}/get_all_personal_poems",
-            headers=headers,
-            json=user_data,
-        )
-        if response.status == 200:
-            data = await response.json()
-        else:
-            return await message.answer("Ошибка при загрузке данных")
 
-    keyboard = await kb.poems(data, page=0, category="fav")
+    url = f"{API_BASE_URL}/get_all_personal_poems"
+    data = await post_to_api(url, data=user_data, headers=HEADERS, timeout=TIMEOUT)
+    
+    keyboard = kb.poems(data or [], page=0, category="fav")
     if keyboard.inline_keyboard:
-        await message.answer(
-            "Список авторских стихов других пользователей!",
-            reply_markup=keyboard,
-        )
+        await message.answer("Авторские стихи других пользователей!", reply_markup=keyboard)
     else:
-        await message.answer(
-            "Пока здесь нет авторских стихов других пользователей.",
-            reply_markup=keyboard,
-        )
+        await message.answer("Пока таких стихов нет.")
 
 
-# Список избранных стихов
 @router.message(Command("selected_poems"))
 @router.message(F.text.endswith("Список избранных стихов"))
-async def get_all_poetry(message: Message):
+async def get_favorites(message: Message):
     user_data = {
         "tg_id": message.from_user.id,
-        "name": message.from_user.full_name,
+        "name": message.from_user.full_name
     }
-    async with aiohttp.ClientSession(timeout=timeout) as session:
-        response = await session.post(
-            f"{API_BASE_URL}/favorite_poems", headers=headers, json=user_data
-        )
-        if response.status == 200:
-            data = await response.json()
-        else:
-            await message.answer("Ошибка")
-    keyboard = await kb.poems(data, page=0, category="fav")
+
+    url = f"{API_BASE_URL}/favorite_poems"
+    data = await post_to_api(url, data=user_data, headers=HEADERS, timeout=TIMEOUT)
+    
+    keyboard = kb.poems(data or [], page=0, category="fav")
     if keyboard.inline_keyboard:
-        await message.answer(
-            "Список ваших избранных стихов!",
-            reply_markup=keyboard,
-        )
+        await message.answer("Ваши избранные стихи:", reply_markup=keyboard)
     else:
-        await message.answer(
-            "Пока здесь нет ваших любимых стихов\nДобавьте понравившийся стих в избранные.",
-            reply_markup=keyboard,
-        )
+        await message.answer("Избранных стихов пока нет.")
 
 
-# Добавление в избранные
 @router.callback_query(F.data == "to_favourite")
-async def add_poetry(callback: CallbackQuery):
+async def add_to_favourite(callback: CallbackQuery):
     text = callback.message.text.split("\n")
     user_data = {
         "tg_id": callback.message.chat.id,
         "user_name": callback.from_user.full_name,
         "poem_author": text[0],
         "poem_title": text[2],
-        "poem_text": "\n".join(text[4::]),
+        "poem_text": "\n".join(text[4:]),
     }
 
+    url = f"{API_BASE_URL}/favorite/add"
+    data = await post_to_api(url, data=user_data, headers=HEADERS, timeout=TIMEOUT)
+    
+    if not data:
+        return await callback.answer("⚠️ Ошибка при добавлении в избранное.")
+
+    await callback.answer("⭐️ Стих добавлен в избранное!")
+
+    new_markup = kb.get_favourite_button(data["is_favorite"])
     try:
-        async with aiohttp.ClientSession(timeout=timeout) as session:
-            response = await session.post(
-                f"{API_BASE_URL}/favorite/add",
-                headers=headers,
-                json=user_data,
-                timeout=timeout,
-            )
-
-        if response.status == 200:
-            data = await response.json()
-        else:
-            return await callback.answer("Ошибка при добавлении в избранное.")
-
-        await callback.answer("Стих добавлен в избранные!")
-
-        new_markup = await kb.get_favourite_button(data["is_favorite"])
-        if callback.message.reply_markup != new_markup:
-            await callback.message.edit_reply_markup(reply_markup=new_markup)
-
-    except (AttributeError, TelegramBadRequest):
-        await callback.message.answer("Увы, вы не можете еще раз добавить этот стих. ❌")  # type: ignore[union-attr]
+        await callback.message.edit_reply_markup(reply_markup=new_markup)
+    except TelegramBadRequest:
         await callback.message.delete()
-        await callback.answer("")
-        return None
 
 
-# Удаление из избранных
 @router.callback_query(F.data == "del_favourite")
-async def del_poetry(callback: CallbackQuery):
+async def del_from_favourite(callback: CallbackQuery):
     text = callback.message.text.split("\n")
     user_data = {
         "tg_id": callback.message.chat.id,
@@ -200,96 +135,55 @@ async def del_poetry(callback: CallbackQuery):
         "poem_author": text[0],
         "poem_title": text[2],
     }
+
+    url = f"{API_BASE_URL}/favorite/remove"
+    data = await post_to_api(url, data=user_data, headers=HEADERS, timeout=TIMEOUT)
+    
+    if not data:
+        return await callback.answer("⚠️ Ошибка при удалении из избранных.")
+
+    await callback.answer("🗑 Удалено из избранных.")
+
+    new_markup = kb.get_favourite_button(data["is_favorite"])
     try:
-        async with aiohttp.ClientSession(timeout=timeout) as session:
-            response = await session.post(
-                f"{API_BASE_URL}/favorite/remove",
-                headers=headers,
-                json=user_data,
-                timeout=timeout,
-            )
-
-        if response.status == 200:
-            data = await response.json()
-        else:
-            return await callback.answer("Ошибка при удалении из избранных.")
-
-        await callback.answer("Стих удален из избранных!")
-
-        new_markup = await kb.get_favourite_button(data["is_favorite"])
-        if callback.message.reply_markup != new_markup:
-            await callback.message.edit_reply_markup(reply_markup=new_markup)
-    except (AttributeError, TelegramBadRequest):
-        await callback.message.answer("Этот стих отсутсвует у вас в избранных. 😢")  # type: ignore[union-attr]
-        await callback.message.delete()  # type: ignore[union-attr]
-        await callback.answer("")
-        return None
+        await callback.message.edit_reply_markup(reply_markup=new_markup)
+    except TelegramBadRequest:
+        await callback.message.delete()
 
 
-# Получение стихотворение
 @router.callback_query(F.data.startswith("poem_"))
 async def poem_info(callback: CallbackQuery):
-    tg_id = callback.message.chat.id
-    user_name = callback.from_user.full_name
     poem_id = callback.data.split("_")[1]
+    user_data = {
+        "tg_id": callback.message.chat.id,
+        "user_name": callback.from_user.full_name,
+        "poem_id": poem_id,
+    }
 
-    try:
-        async with aiohttp.ClientSession(timeout=timeout) as session:
-            response = await session.post(
-                f"{API_BASE_URL}/poems",
-                headers=headers,
-                json={
-                    "tg_id": tg_id,
-                    "user_name": user_name,
-                    "poem_id": poem_id,
-                },
-                timeout=timeout,
+    url = f"{API_BASE_URL}/poems"
+    data = await post_to_api(url, data=user_data, headers=HEADERS, timeout=TIMEOUT)
+    
+    if not data:
+        await callback.answer("⚠️ Ошибка при получении стиха.")
+        await callback.message.delete()
+        return
+
+    await callback.answer("")
+    markup = (
+        kb.get_moderation_keyboard(data["order"]["status"], data["order"]["poem_id"])
+        if callback.from_user.id == int(ADMIN) and data.get("order")
+        else (
+            kb.get_moderation_keyboard(None, poem_id)
+            if callback.from_user.id == int(ADMIN)
+            else kb.get_favourite_button(
+                data["is_favorite"],
+                data["poem"]["is_personal"],
+                data["is_author"],
+                poem_id=poem_id,
             )
-        data = None
-        if response.status == 200:
-            data = await response.json()
-            await callback.answer("")
-            
-            if int(tg_id) == int(ADMIN):
-                if data.get('order') is None:
-                    await callback.message.answer(  # type: ignore[union-attr]
-                        f"{data['poem']['author']}\n\n{data['poem']['title']}\n\n{data['poem']['text']}",
-                        reply_markup=await kb.get_moderation_keyboard(status=None, poem_id=poem_id),
-                    ),
-                else:
-                    await callback.message.answer(  # type: ignore[union-attr]
-                        f"{data['poem']['author']}\n\n{data['poem']['title']}\n\n{data['poem']['text']}",
-                        reply_markup=await kb.get_moderation_keyboard(data['order']['status'], data['order']['poem_id']),
-                    ),
-            else:
-                await callback.message.answer(  # type: ignore[union-attr]
-                    f"{data['poem']['author']}\n\n{data['poem']['title']}\n\n{data['poem']['text']}",
-                    reply_markup=await kb.get_favourite_button(
-                        data["is_favorite"],
-                        data["poem"]["is_personal"],
-                        data["is_author"],
-                        poem_id=poem_id,
-                    ),
-                ),
-
-        else:
-            await callback.answer(
-                f"Ошибка {response.status}: не удалось получить стих."
-            )
-            await callback.message.delete()
-
-    except AttributeError:
-        await callback.message.answer(
-            "Увы, вы не можете больше получить этот стих,\nон был удален. 😢"
         )
-    except aiohttp.ClientConnectionError as e:
-        logging.error(f"ERROR ❌ Connection error: {e}")
-        await callback.message.answer("Ошибка соединения с сервером. Попробуйте позже.")
-    except aiohttp.ClientResponseError as e:
-        logging.error(f"ERROR ❌ Response error: {e.status} {e.message}")
-    except asyncio.TimeoutError:
-        logging.error(f"ERROR ❌ Request timeout")
-        await callback.message.answer("Сервер не отвечает. Попробуйте позже.")
-    except RuntimeError as e:
-        logging.error(f"ERROR ❌ Runtime error: {e}")
-        await callback.message.answer("Произошла внутренняя ошибка. Попробуйте позже.")
+    )
+    await callback.message.answer(
+        f"{data['poem']['author']}\n\n{data['poem']['title']}\n\n{data['poem']['text']}",
+        reply_markup=markup,
+    )
